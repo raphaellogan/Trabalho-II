@@ -1,38 +1,13 @@
 from config.db import conectar
-from datetime import datetime
 
 
-# ==========================================
-# CADASTRAR CLIENTE
-# ==========================================
-def criar_cliente(
-    nome,
-    cpf,
-    telefone,
-    email,
-    endereco,
-    aceite_lgpd
-):
+def criar_cliente(nome, cpf, telefone, email, endereco, aceite_lgpd, data_consentimento):
     conexao = conectar()
     cursor = conexao.cursor()
 
-    # Gera automaticamente a data do consentimento
-    if aceite_lgpd:
-        data_consentimento = datetime.now()
-    else:
-        data_consentimento = None
-
     sql = """
         INSERT INTO cliente
-        (
-            nome,
-            cpf,
-            telefone,
-            email,
-            endereco,
-            aceite_lgpd,
-            data_consentimento
-        )
+        (nome, cpf, telefone, email, endereco, aceite_lgpd, data_consentimento)
         VALUES (%s, %s, %s, %s, %s, %s, %s)
     """
 
@@ -42,25 +17,20 @@ def criar_cliente(
         telefone,
         email,
         endereco,
-        aceite_lgpd,
+        bool(aceite_lgpd),
         data_consentimento
     ))
 
     conexao.commit()
-
     cursor.close()
     conexao.close()
 
 
-# ==========================================
-# LISTAR CLIENTES
-# ==========================================
 def listar_clientes():
     conexao = conectar()
     cursor = conexao.cursor(dictionary=True)
 
-    cursor.execute("SELECT * FROM cliente")
-
+    cursor.execute("SELECT * FROM cliente ORDER BY nome ASC")
     clientes = cursor.fetchall()
 
     cursor.close()
@@ -69,9 +39,6 @@ def listar_clientes():
     return clientes
 
 
-# ==========================================
-# BUSCAR CLIENTE POR ID
-# ==========================================
 def buscar_cliente_por_id(id_cliente):
     conexao = conectar()
     cursor = conexao.cursor(dictionary=True)
@@ -89,90 +56,57 @@ def buscar_cliente_por_id(id_cliente):
     return cliente
 
 
-# ==========================================
-# BUSCAR CLIENTE POR CPF
-# ==========================================
-def buscar_cliente_por_cpf(cpf):
-    conexao = conectar()
-    cursor = conexao.cursor(dictionary=True)
-
-    cursor.execute(
-        "SELECT * FROM cliente WHERE cpf = %s",
-        (cpf,)
-    )
-
-    cliente = cursor.fetchone()
-
-    cursor.close()
-    conexao.close()
-
-    return cliente
-
-
-# ==========================================
-# ALTERAR CLIENTE
-# ==========================================
-def atualizar_cliente(
-    id_cliente,
-    nome,
-    cpf,
-    telefone,
-    email,
-    endereco,
-    aceite_lgpd
-):
+def atualizar_cliente(id_cliente, dados):
     conexao = conectar()
     cursor = conexao.cursor()
 
-    # Atualiza automaticamente a data do consentimento
-    if aceite_lgpd:
-        data_consentimento = datetime.now()
-    else:
-        data_consentimento = None
+    campos_permitidos = [
+        "nome",
+        "cpf",
+        "telefone",
+        "email",
+        "endereco",
+        "aceite_lgpd",
+        "data_consentimento"
+    ]
 
-    sql = """
-        UPDATE cliente
-        SET
-            nome = %s,
-            cpf = %s,
-            telefone = %s,
-            email = %s,
-            endereco = %s,
-            aceite_lgpd = %s,
-            data_consentimento = %s
-        WHERE id_cliente = %s
-    """
+    campos = []
+    valores = []
 
-    cursor.execute(sql, (
-        nome,
-        cpf,
-        telefone,
-        email,
-        endereco,
-        aceite_lgpd,
-        data_consentimento,
-        id_cliente
-    ))
+    for campo in campos_permitidos:
+        if campo in dados:
+            campos.append(f"{campo} = %s")
+            valores.append(bool(dados[campo]) if campo == "aceite_lgpd" else dados[campo])
 
+    if not campos:
+        cursor.close()
+        conexao.close()
+        return 0
+
+    sql = f"UPDATE cliente SET {', '.join(campos)} WHERE id_cliente = %s"
+    valores.append(id_cliente)
+    cursor.execute(sql, valores)
+
+    linhas_afetadas = cursor.rowcount
     conexao.commit()
-
     cursor.close()
     conexao.close()
 
+    return linhas_afetadas
 
-# ==========================================
-# CANCELAR CLIENTE
-# ==========================================
+
 def cancelar_cliente(id_cliente):
     conexao = conectar()
     cursor = conexao.cursor()
 
-    cursor.execute(
-        "DELETE FROM cliente WHERE id_cliente = %s",
-        (id_cliente,)
-    )
+    sql = "DELETE FROM cliente WHERE id_cliente = %s"
+    cursor.execute(sql, (id_cliente,))
 
+    linhas_afetadas = cursor.rowcount
     conexao.commit()
-
     cursor.close()
     conexao.close()
+
+    return linhas_afetadas
+
+

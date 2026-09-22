@@ -1,0 +1,694 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Motora | Gestão de motos</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap"
+      rel="stylesheet"
+    >
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  </head>
+
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar" id="sidebar">
+        <div class="brand">
+          <span class="brand-mark">M</span>
+          <span>motora</span>
+        </div>
+
+        <p class="eyebrow">CENTRAL DE OPERAÇÕES</p>
+
+        <nav class="nav-list" aria-label="Navegação principal">
+          <button class="nav-item active" data-view="dashboard"><span>◈</span> Visão geral</button>
+          <button class="nav-item" data-view="produtos"><span>▦</span> Inventário</button>
+          <button class="nav-item" data-view="clientes"><span>♙</span> Clientes</button>
+          <button class="nav-item" data-view="fornecedores"><span>◒</span> Fornecedores</button>
+          <button class="nav-item" data-view="vendas"><span>↗</span> Vendas</button>
+          <button class="nav-item" data-view="cadastros"><span>＋</span> Cadastros</button>
+        </nav>
+
+        <div class="sidebar-note">
+          <span class="status-dot"></span>
+          <div>
+            <strong>Sistema online</strong>
+            <small>Banco de motos</small>
+          </div>
+        </div>
+      </aside>
+
+      <main class="main-content">
+        <header class="topbar">
+          <button class="icon-button menu-button" id="menu-button" aria-label="Abrir menu">☰</button>
+          <div class="breadcrumb">
+            <span>Motora</span>
+            <b>/</b>
+            <strong id="breadcrumb-label">Visão geral</strong>
+          </div>
+          <div class="top-actions">
+            <button class="theme-toggle" id="theme-toggle" type="button" aria-label="Ativar modo escuro" title="Alternar tema">🌙</button>
+          </div>
+        </header>
+
+        <section class="page" id="view-dashboard">
+          <div class="page-heading">
+            <div>
+              <p class="kicker">PAINEL DE CONTROLE</p>
+              <h1>{{ saudacao }}<span>✦</span></h1>
+              <p class="muted">Acompanhe o pulso da sua operação em um só lugar.</p>
+            </div>
+            <div class="page-actions">
+              <button class="primary-button secondary-button-row" data-open-form="venda">↗ Nova venda</button>
+              <button class="primary-button" data-view="cadastros">＋ Novo cadastro</button>
+            </div>
+          </div>
+
+          <div class="metric-grid">
+            <article class="metric-card accent">
+              <div class="metric-icon">▦</div>
+              <p>Produtos ativos</p>
+              <strong id="metric-products">{{ produtos|length }}</strong>
+              <small id="metric-stock">{{ total_estoque }} unidades no estoque</small>
+            </article>
+
+            <article class="metric-card">
+              <div class="metric-icon green">♙</div>
+              <p>Clientes cadastrados</p>
+              <strong id="metric-clients">{{ clientes|length }}</strong>
+              <small class="positive">Base ativa</small>
+            </article>
+
+            <article class="metric-card">
+              <div class="metric-icon orange">↗</div>
+              <p>Vendas registradas</p>
+              <strong id="metric-sales">{{ vendas|length }}</strong>
+              <small>Histórico completo</small>
+            </article>
+
+            <article class="metric-card">
+              <div class="metric-icon violet">◷</div>
+              <p>Receita acumulada</p>
+              <strong id="metric-revenue">{{ metric_revenue }}</strong>
+              <small>Valor total das vendas</small>
+            </article>
+          </div>
+
+          <div class="dashboard-grid">
+            <section class="panel chart-panel">
+              <div class="panel-heading">
+                <div>
+                  <h2>Atividade recente</h2>
+                  <p class="muted">Visão rápida das últimas vendas</p>
+                </div>
+                <span class="live-label"><i></i> AO VIVO</span>
+              </div>
+
+              <div class="bar-chart" id="sales-chart">
+                {% if recent_sales %}
+                  {% for item in recent_sales %}
+                    {% set max_value = vendas | map(attribute='valor_total') | list | max | default(1) %}
+                    {% set percent = ((item.valor_total|float / max_value|float) * 100) if max_value else 0 %}
+                    <div class="bar-wrap">
+                      <span class="bar-value">R$ {{ item.valor_total }}</span>
+                      <div class="bar" style="height: {{ (15 + ((percent|float * 0.85))) if max_value else 15 }}%;" title="R$ {{ item.valor_total }}"></div>
+                      <span class="bar-date">{{ item.data_venda }}</span>
+                    </div>
+                  {% endfor %}
+                {% else %}
+                  <div class="chart-empty">Registre vendas para visualizar a atividade.</div>
+                {% endif %}
+              </div>
+
+              <div class="chart-axis">
+                <span>Sem dados</span>
+                <span>Hoje</span>
+              </div>
+            </section>
+
+            <section class="panel stock-panel">
+              <div class="panel-heading">
+                <div>
+                  <h2>Atenção no estoque</h2>
+                  <p class="muted">Itens que pedem reposição</p>
+                </div>
+                <button class="text-button" data-view="produtos">Ver tudo →</button>
+              </div>
+
+              <div id="low-stock-list" class="activity-list">
+                {% if low_stock %}
+                  {% for item in low_stock %}
+                    <div class="stock-item">
+                      <div>
+                        <strong>{{ item.nome }}</strong>
+                        <small>Código {{ item.codigo_de_barra or 'não informado' }}</small>
+                      </div>
+                      <span class="stock-count">{{ item.estoque or 0 }} un.</span>
+                    </div>
+                  {% endfor %}
+                {% else %}
+                  <div class="empty-state">Estoque saudável por aqui.</div>
+                {% endif %}
+              </div>
+            </section>
+          </div>
+
+          <section class="panel recent-panel">
+            <div class="panel-heading">
+              <div>
+                <h2>Últimas vendas</h2>
+                <p class="muted">Movimentações mais recentes da loja</p>
+              </div>
+              <button class="text-button" data-view="vendas">Ver todas →</button>
+            </div>
+
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Venda</th>
+                    <th>Cliente</th>
+                    <th>Data</th>
+                    <th>Valor</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="recent-sales">
+                  {% if recent_sales %}
+                    {% for item in recent_sales %}
+                      <tr>
+                        <td><strong>#{{ item.id_venda }}</strong></td>
+                        <td>{{ item.cliente or ('Cliente ' ~ item.id_cliente) }}</td>
+                        <td>{{ item.data_venda }}</td>
+                        <td><strong>R$ {{ item.valor_total }}</strong></td>
+                        <td><span class="status-pill">Concluída</span></td>
+                      </tr>
+                    {% endfor %}
+                  {% else %}
+                    <tr><td colspan="5" class="empty-state">Nenhuma venda registrada.</td></tr>
+                  {% endif %}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <section class="page hidden" id="view-produtos">
+          <div class="page-heading">
+            <div>
+              <p class="kicker">CATÁLOGO</p>
+              <h1>Inventário</h1>
+              <p class="muted">Controle seus produtos e acompanhe o estoque.</p>
+            </div>
+            <div class="page-actions-inline">
+              <button class="primary-button" data-open-form="produto">＋ Adicionar produto</button>
+              <button class="secondary-button" data-open-form="produto-estoque">＋ Repor estoque</button>
+            </div>
+          </div>
+
+          <div class="toolbar product-toolbar">
+            <div class="search-field">⌕ <input id="product-search" placeholder="Buscar produto..." type="search"></div>
+            <button type="button" class="secondary-button" id="category-filter-toggle">Filtrar por categoria</button>
+            <span class="result-count" id="product-count">{{ produtos|length }} itens</span>
+          </div>
+
+          <div class="category-filter-panel hidden" id="category-filter-panel">
+            <div class="category-filter-header">
+              <strong>Categorias</strong>
+              <button type="button" class="text-button compact" id="select-all-categories">Selecionar todas</button>
+            </div>
+            <div class="category-filter-list">
+              {% if categorias %}
+                {% for categoria in categorias %}
+                  <label class="category-option">
+                    <input type="checkbox" class="category-checkbox" value="{{ categoria.id_categoria }}" checked>
+                    <span>{{ categoria.nome }}</span>
+                  </label>
+                {% endfor %}
+              {% else %}
+                <span class="muted">Nenhuma categoria cadastrada.</span>
+              {% endif %}
+            </div>
+          </div>
+
+          <section class="panel">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Produto</th>
+                    <th>Categoria</th>
+                    <th>Preço</th>
+                    <th>Estoque</th>
+                    <th>Código</th>
+                  </tr>
+                </thead>
+                <tbody id="products-table">
+                  {% if produtos %}
+                    {% for item in produtos %}
+                      {% set categoria_nome = categorias | selectattr('id_categoria', 'equalto', item.id_categoria) | map(attribute='nome') | list | first %}
+                      <tr data-row data-name="{{ item.nome|lower }}" data-category-id="{{ item.id_categoria }}">
+                        <td><strong>#{{ item.id_produto }}</strong></td>
+                        <td>
+                          <strong class="person-name">{{ item.nome or 'Sem nome' }}</strong>
+                          <span class="person-sub">{{ item.descricao or 'Sem descrição' }}</span>
+                        </td>
+                        <td>{{ categoria_nome or '—' }}</td>
+                        <td>R$ {{ item.preco }}</td>
+                        <td>
+                          <span class="stock-count" style="{{ 'color:var(--green);background:#e5f4ec' if item.estoque|int > 5 else '' }}">
+                            {{ item.estoque or 0 }} un.
+                          </span>
+                        </td>
+                        <td>{{ item.codigo_de_barra or '—' }}</td>
+                      </tr>
+                    {% endfor %}
+                  {% else %}
+                    <tr><td colspan="6" class="empty-state">Nenhum produto encontrado.</td></tr>
+                  {% endif %}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <section class="page hidden" id="view-clientes">
+          <div class="page-heading">
+            <div>
+              <p class="kicker">RELACIONAMENTO</p>
+              <h1>Clientes</h1>
+              <p class="muted">Uma visão simples e humana da sua base.</p>
+            </div>
+            <button class="primary-button" data-open-form="cliente">＋ Novo cliente</button>
+          </div>
+
+          <div class="toolbar">
+            <div class="search-field">⌕ <input id="client-search" placeholder="Buscar cliente..." type="search"></div>
+            <span class="result-count" id="client-count">{{ clientes|length }} itens</span>
+          </div>
+
+          <section class="panel">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Cliente</th>
+                    <th>CPF</th>
+                    <th>Contato</th>
+                    <th>Endereço</th>
+                    <th>LGPD</th>
+                  </tr>
+                </thead>
+                <tbody id="clients-table">
+                  {% if clientes %}
+                    {% for item in clientes %}
+                      <tr data-row data-name="{{ item.nome|lower }} {{ item.cpf|default('')|lower }} {{ item.email|default('')|lower }}">
+                        <td><strong>#{{ item.id_cliente }}</strong></td>
+                        <td>
+                          <strong class="person-name">{{ item.nome }}</strong>
+                          <span class="person-sub">{{ item.email or 'Sem e-mail' }}</span>
+                        </td>
+                        <td>{{ item.cpf or '—' }}</td>
+                        <td>{{ item.telefone or '—' }}</td>
+                        <td>{{ item.endereco or '—' }}</td>
+                        <td><span class="status-pill">{{ 'Aceito' if item.aceite_lgpd else 'Pendente' }}</span></td>
+                      </tr>
+                    {% endfor %}
+                  {% else %}
+                    <tr><td colspan="6" class="empty-state">Nenhum cliente cadastrado.</td></tr>
+                  {% endif %}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <section class="page hidden" id="view-fornecedores">
+          <div class="page-heading">
+            <div>
+              <p class="kicker">PARCEIROS</p>
+              <h1>Fornecedores</h1>
+              <p class="muted">Consulte seus fornecedores e mantenha o fluxo produtivo em ordem.</p>
+            </div>
+            <button class="primary-button" data-open-form="fornecedor">＋ Novo fornecedor</button>
+          </div>
+
+          <div class="toolbar">
+            <div class="search-field">⌕ <input id="supplier-search" placeholder="Buscar fornecedor..." type="search"></div>
+            <span class="result-count" id="supplier-count">{{ fornecedores|length }} itens</span>
+          </div>
+
+          <section class="panel">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Fornecedor</th>
+                    <th>CNPJ</th>
+                    <th>Telefone</th>
+                    <th>E-mail</th>
+                  </tr>
+                </thead>
+                <tbody id="supplier-table">
+                  {% if fornecedores %}
+                    {% for item in fornecedores %}
+                      <tr data-row data-name="{{ item.nome|lower }} {{ item.cnpj|default('')|lower }} {{ item.email|default('')|lower }}">
+                        <td><strong>#{{ item.id_fornecedor }}</strong></td>
+                        <td><strong class="person-name">{{ item.nome or 'Sem nome' }}</strong></td>
+                        <td>{{ item.cnpj or '—' }}</td>
+                        <td>{{ item.telefone or '—' }}</td>
+                        <td>{{ item.email or '—' }}</td>
+                      </tr>
+                    {% endfor %}
+                  {% else %}
+                    <tr><td colspan="5" class="empty-state">Nenhum fornecedor cadastrado.</td></tr>
+                  {% endif %}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <section class="page hidden" id="view-vendas">
+          <div class="page-heading">
+            <div>
+              <p class="kicker">COMERCIAL</p>
+              <h1>Vendas</h1>
+              <p class="muted">Acompanhe o histórico comercial da operação.</p>
+            </div>
+            <button class="primary-button" data-open-form="venda">＋ Registrar venda</button>
+          </div>
+
+          <div class="toolbar">
+            <div class="search-field">⌕ <input id="sales-search" placeholder="Buscar venda..." type="search"></div>
+            <span class="result-count" id="sales-count">{{ vendas|length }} itens</span>
+          </div>
+
+          <section class="panel">
+            <div class="table-wrap">
+              <table>
+                <thead>
+                  <tr>
+                    <th>ID</th>
+                    <th>Cliente</th>
+                    <th>Produto</th>
+                    <th>Qtd.</th>
+                    <th>Data</th>
+                    <th>Valor total</th>
+                    <th>Status</th>
+                  </tr>
+                </thead>
+                <tbody id="sales-table">
+                  {% if vendas %}
+                    {% for item in vendas %}
+                      <tr data-row data-name="{{ item.cliente|default('')|lower }} {{ item.produto|default('')|lower }} {{ item.id_cliente|string|lower }} {{ item.data_venda|lower }}">
+                        <td><strong>#{{ item.id_venda }}</strong></td>
+                        <td><strong class="person-name">{{ item.cliente or ('Cliente ' ~ item.id_cliente) }}</strong></td>
+                        <td>{{ item.produto or '—' }}</td>
+                        <td>{{ item.quantidade or 0 }}</td>
+                        <td>{{ item.data_venda }}</td>
+                        <td><strong>R$ {{ item.valor_total }}</strong></td>
+                        <td><span class="status-pill">Concluída</span></td>
+                      </tr>
+                    {% endfor %}
+                  {% else %}
+                    <tr><td colspan="7" class="empty-state">Nenhuma venda registrada.</td></tr>
+                  {% endif %}
+                </tbody>
+              </table>
+            </div>
+          </section>
+        </section>
+
+        <section class="page hidden" id="view-cadastros">
+          <div class="page-heading">
+            <div>
+              <p class="kicker">OPERAÇÃO</p>
+              <h1>Cadastros rápidos</h1>
+              <p class="muted">Mantenha sua base organizada e pronta para vender.</p>
+            </div>
+          </div>
+
+          <div class="form-cards">
+            <button class="action-card" data-open-form="produto">
+              <span class="card-symbol orange-bg">▦</span>
+              <strong>Novo produto</strong>
+              <small>Adicionar item ao estoque →</small>
+            </button>
+
+            <button class="action-card" data-open-form="cliente">
+              <span class="card-symbol green-bg">♙</span>
+              <strong>Novo cliente</strong>
+              <small>Criar relacionamento →</small>
+            </button>
+
+            <button class="action-card" data-open-form="categoria">
+              <span class="card-symbol purple-bg">◈</span>
+              <strong>Nova categoria</strong>
+              <small>Organizar catálogo →</small>
+            </button>
+
+            <button class="action-card" data-open-form="fornecedor">
+              <span class="card-symbol blue-bg">◒</span>
+              <strong>Novo fornecedor</strong>
+              <small>Expandir parceiros →</small>
+            </button>
+          </div>
+
+          <div class="tip-banner">
+            <span>✦</span>
+            <div>
+              <strong>Uma operação bem cuidada começa com dados bem preenchidos.</strong>
+              <p>Use os cadastros rápidos para manter seu catálogo sempre atualizado.</p>
+            </div>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <div class="modal-backdrop hidden" id="modal-produto">
+      <div class="modal">
+        <button class="modal-close" data-close="produto" aria-label="Fechar modal">×</button>
+        <p class="kicker">CADASTRO</p>
+        <h2>Novo produto</h2>
+
+        <form id="form-produto" data-type="produto">
+          <div class="form-grid">
+            <div class="form-field">
+              <label for="produto-nome">Nome do produto *</label>
+              <input id="produto-nome" name="nome" type="text" required>
+            </div>
+            <div class="form-field">
+              <label for="produto-preco">Preço *</label>
+              <input id="produto-preco" name="preco" type="number" step="0.01" required>
+            </div>
+            <div class="form-field">
+              <label for="produto-estoque">Estoque inicial *</label>
+              <input id="produto-estoque" name="estoque" type="number" required>
+            </div>
+            <div class="form-field">
+              <label for="produto-codigo">Código de barras *</label>
+              <input id="produto-codigo" name="codigo_de_barra" type="text" required>
+            </div>
+            <div class="form-field">
+              <label for="produto-id-categoria">ID da categoria *</label>
+              <input id="produto-id-categoria" name="id_categoria" type="number" required>
+            </div>
+            <div class="form-field">
+              <label for="produto-id-fornecedor">ID do fornecedor *</label>
+              <input id="produto-id-fornecedor" name="id_fornecedor" type="number" required>
+            </div>
+            <div class="form-field full">
+              <label for="produto-descricao">Descrição</label>
+              <input id="produto-descricao" name="descricao" type="text">
+            </div>
+          </div>
+          <button class="primary-button form-submit" type="submit">Salvar</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal-backdrop hidden" id="modal-produto-estoque">
+      <div class="modal">
+        <button class="modal-close" data-close="produto-estoque" aria-label="Fechar modal">×</button>
+        <p class="kicker">ESTOQUE</p>
+        <h2>Repor estoque</h2>
+
+        <form id="form-produto-estoque" data-type="produto-estoque">
+          <div class="form-grid">
+            <div class="form-field full">
+              <label for="produto-estoque-selecionado">Produto existente *</label>
+              <input
+                id="produto-estoque-selecionado"
+                name="produto_existente_id"
+                type="text"
+                list="product-stock-list"
+                autocomplete="off"
+                placeholder="Digite o ID ou nome do produto"
+              >
+              <datalist id="product-stock-list">
+                {% for produto in produtos %}
+                  <option value="{{ produto.id_produto }} - {{ produto.nome }}"></option>
+                {% endfor %}
+              </datalist>
+            </div>
+            <div class="form-field full">
+              <label for="produto-estoque-adicional">Quantidade a adicionar *</label>
+              <input id="produto-estoque-adicional" name="estoque_adicional" type="number" min="1" value="1">
+            </div>
+            <div class="form-field full">
+              <div id="produto-estoque-info" class="stock-info">Selecione um produto para ver o estoque atual.</div>
+            </div>
+          </div>
+          <button class="primary-button form-submit" type="submit">Salvar estoque</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal-backdrop hidden" id="modal-cliente">
+      <div class="modal">
+        <button class="modal-close" data-close="cliente" aria-label="Fechar modal">×</button>
+        <p class="kicker">CADASTRO</p>
+        <h2>Novo cliente</h2>
+        <form id="form-cliente" data-type="cliente">
+          <div class="form-grid">
+            <div class="form-field">
+              <label for="cliente-nome">Nome completo *</label>
+              <input id="cliente-nome" name="nome" type="text" required>
+            </div>
+            <div class="form-field">
+              <label for="cliente-cpf">CPF *</label>
+              <input id="cliente-cpf" name="cpf" type="text" maxlength="11" required>
+            </div>
+            <div class="form-field">
+              <label for="cliente-telefone">Telefone</label>
+              <input id="cliente-telefone" name="telefone" type="text" maxlength="11">
+            </div>
+            <div class="form-field">
+              <label for="cliente-email">E-mail</label>
+              <input id="cliente-email" name="email" type="email">
+            </div>
+            <div class="form-field full">
+              <label for="cliente-endereco">Endereço</label>
+              <input id="cliente-endereco" name="endereco" type="text">
+            </div>
+            <div class="form-field full">
+              <label for="cliente-lgpd">Aceito os termos da LGPD *</label>
+              <input id="cliente-lgpd" name="aceite_lgpd" type="checkbox" value="true">
+            </div>
+          </div>
+          <button class="primary-button form-submit" type="submit">Salvar cadastro</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal-backdrop hidden" id="modal-categoria">
+      <div class="modal">
+        <button class="modal-close" data-close="categoria" aria-label="Fechar modal">×</button>
+        <p class="kicker">CADASTRO</p>
+        <h2>Nova categoria</h2>
+        <form id="form-categoria" data-type="categoria">
+          <div class="form-grid">
+            <div class="form-field full">
+              <label for="categoria-nome">Nome da categoria *</label>
+              <input id="categoria-nome" name="nome" type="text" required>
+            </div>
+            <div class="form-field full">
+              <label for="categoria-descricao">Descrição *</label>
+              <input id="categoria-descricao" name="descricao" type="text" required>
+            </div>
+          </div>
+          <button class="primary-button form-submit" type="submit">Salvar cadastro</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal-backdrop hidden" id="modal-fornecedor">
+      <div class="modal">
+        <button class="modal-close" data-close="fornecedor" aria-label="Fechar modal">×</button>
+        <p class="kicker">CADASTRO</p>
+        <h2>Novo fornecedor</h2>
+        <form id="form-fornecedor" data-type="fornecedor">
+          <div class="form-grid">
+            <div class="form-field">
+              <label for="fornecedor-nome">Nome da empresa *</label>
+              <input id="fornecedor-nome" name="nome" type="text" required>
+            </div>
+            <div class="form-field">
+              <label for="fornecedor-cnpj">CNPJ *</label>
+              <input id="fornecedor-cnpj" name="cnpj" type="text" maxlength="14" required>
+            </div>
+            <div class="form-field">
+              <label for="fornecedor-telefone">Telefone</label>
+              <input id="fornecedor-telefone" name="telefone" type="text" maxlength="11">
+            </div>
+            <div class="form-field">
+              <label for="fornecedor-email">E-mail</label>
+              <input id="fornecedor-email" name="email" type="email">
+            </div>
+          </div>
+          <button class="primary-button form-submit" type="submit">Salvar cadastro</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="modal-backdrop hidden" id="modal-venda">
+      <div class="modal">
+        <button class="modal-close" data-close="venda" aria-label="Fechar modal">×</button>
+        <p class="kicker">CADASTRO</p>
+        <h2>Registrar venda</h2>
+        <form id="form-venda" data-type="venda">
+          <div class="form-grid">
+            <div class="form-field">
+              <label for="venda-data">Data da venda *</label>
+              <input id="venda-data" name="data_venda" type="date" required>
+            </div>
+            <div class="form-field full">
+              <label for="venda-produto">Produto *</label>
+              <input
+                id="venda-produto"
+                name="id_produto"
+                type="text"
+                list="product-options-list"
+                autocomplete="off"
+                placeholder="Digite o ID ou nome do produto"
+                required
+              >
+              <datalist id="product-options-list">
+                {% for produto in produtos %}
+                  <option value="{{ produto.id_produto }} - {{ produto.nome }}"></option>
+                {% endfor %}
+              </datalist>
+            </div>
+            <div class="form-field">
+              <label for="venda-quantidade">Quantidade *</label>
+              <input id="venda-quantidade" name="quantidade" type="number" min="1" required>
+            </div>
+            <div class="form-field full">
+              <label for="venda-valor">Valor total</label>
+              <input id="venda-valor" name="valor_total" type="number" step="0.01" readonly>
+            </div>
+            <div class="form-field full">
+              <label for="venda-cliente">ID do cliente *</label>
+              <input id="venda-cliente" name="id_cliente" type="number" required>
+            </div>
+          </div>
+          <button class="primary-button form-submit" type="submit">Salvar cadastro</button>
+        </form>
+      </div>
+    </div>
+
+    <div class="toast" id="toast"></div>
+
+    <script>
+      window.produtosCatalog = {{ produtos_json|tojson }};
+    </script>
+    <script src="{{ url_for('static', filename='app.js') }}"></script>
+  </body>
+</html>

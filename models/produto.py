@@ -1,36 +1,13 @@
 from config.db import conectar
 
 
-# ==========================================
-# CADASTRAR PRODUTO
-# ==========================================
-def cadastrar_produto(
-    nome,
-    descricao,
-    preco,
-    estoque,
-    id_categoria,
-    id_fornecedor,
-    cor,
-    tamanho,
-    codigo_de_barra
-):
+def cadastrar_produto(nome, descricao, preco, estoque, id_categoria, id_fornecedor, cor, tamanho, codigo_de_barra):
     conexao = conectar()
     cursor = conexao.cursor()
 
     sql = """
         INSERT INTO produto
-        (
-            nome,
-            descricao,
-            preco,
-            estoque,
-            id_categoria,
-            id_fornecedor,
-            cor,
-            tamanho,
-            codigo_de_barra
-        )
+        (nome, descricao, preco, estoque, id_categoria, id_fornecedor, cor, tamanho, codigo_de_barra)
         VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s)
     """
 
@@ -53,9 +30,6 @@ def cadastrar_produto(
     conexao.close()
 
 
-# ==========================================
-# LISTAR TODOS OS PRODUTOS
-# ==========================================
 def listar_produtos():
     conexao = conectar()
     cursor = conexao.cursor(dictionary=True)
@@ -70,21 +44,11 @@ def listar_produtos():
     return produtos
 
 
-# ==========================================
-# BUSCAR PRODUTO POR ID
-# ==========================================
 def buscar_produto(id_produto):
     conexao = conectar()
     cursor = conexao.cursor(dictionary=True)
 
-    sql = """
-        SELECT *
-        FROM produto
-        WHERE id_produto = %s
-    """
-
-    cursor.execute(sql, (id_produto,))
-
+    cursor.execute("SELECT * FROM produto WHERE id_produto = %s", (id_produto,))
     produto = cursor.fetchone()
 
     cursor.close()
@@ -93,9 +57,6 @@ def buscar_produto(id_produto):
     return produto
 
 
-# ==========================================
-# ALTERAR PRODUTO
-# ==========================================
 def alterar_produto(id_produto, dados):
     conexao = conectar()
     cursor = conexao.cursor()
@@ -125,44 +86,12 @@ def alterar_produto(id_produto, dados):
         conexao.close()
         return 0
 
-    sql = f"""
-        UPDATE produto
-        SET {", ".join(campos)}
-        WHERE id_produto = %s
-    """
-
+    sql = f"UPDATE produto SET {', '.join(campos)} WHERE id_produto = %s"
     valores.append(id_produto)
-
     cursor.execute(sql, valores)
 
     linhas_afetadas = cursor.rowcount
-
     conexao.commit()
-
-    cursor.close()
-    conexao.close()
-
-    return linhas_afetadas
-
-
-# ==========================================
-# DELETAR PRODUTO
-# ==========================================
-def deletar_produto(id_produto):
-    conexao = conectar()
-    cursor = conexao.cursor()
-
-    sql = """
-        DELETE FROM produto
-        WHERE id_produto = %s
-    """
-
-    cursor.execute(sql, (id_produto,))
-
-    linhas_afetadas = cursor.rowcount
-
-    conexao.commit()
-
     cursor.close()
     conexao.close()
 
